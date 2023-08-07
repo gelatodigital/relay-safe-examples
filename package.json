@@ -4,9 +4,10 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "docs": "ts-node src/docs.ts",
-    "account": "ts-node src/account.ts",
-    "stake": "ts-node src/stake.ts",
+    "aa1Balance": "ts-node src/aa1Balance.ts",
+    "aaSyncFee": "ts-node src/aaSyncFee.ts",
+    "safe1Balance": "ts-node src/safe1Balance.ts",
+    "safeSyncFee": "ts-node src/safeSyncFee.ts",
     "build": "tsc",
     "serve": "node dist/index.js"
   },

@@ -11,17 +11,38 @@ Please copy the .env.example --> and add the PK, Alchemy key and Gelato SponsorK
 #### Account Abstraction sdk
 Example of using Gelato relay with the Safe Account Abstraction 
 
-Code can be found [here](src/account.ts)
+- Using SyncFee
+
+Code can be found [here](src/aaSyncFee.ts)
 
 ```
-yarn account
+yarn aaSyncFee
 ```
+
+- Using 1Balance
+
+Code can be found [here](src/aa1Balance.ts)
+
+```
+yarn aa1Balance
+```
+
 
 #### Safe sdk integration using relay-kit
 Example of using Gelato relay with the the Safe sdk. In this example you can relay transactions through any Safe controlled by the signer passing the Safe address
 
-Code can be found [here](src/docs.ts)
+- Using SyncFee
+
+Code can be found [here](src/safeSyncFee.ts)
 
 ```
-yarn docs
+yarn safeSyncFee
+```
+
+- Using 1Balance
+
+Code can be found [here](src/safe1Balance.ts)
+
+```
+yarn safe1Balance
 ```

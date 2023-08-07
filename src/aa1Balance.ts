@@ -59,25 +59,13 @@ async function relayTransaction() {
     VALUE: "0",
     // Options:
     GAS_LIMIT: gasLimit,
-    GAS_TOKEN: ethers.constants.AddressZero,
   };
-
-
 
   const predictedSafeAddress = await safeAccountAbstraction.getSafeAddress();
   console.log({ predictedSafeAddress });
 
   const isSafeDeployed = await safeAccountAbstraction.isSafeDeployed();
   console.log({ isSafeDeployed });
-
-  const safeBalance = await provider.getBalance(predictedSafeAddress);
-
-  const relayFee = await relayPack.getEstimateFee(
-    chainId,
-    txConfig.GAS_LIMIT,
-    txConfig.GAS_TOKEN
-  );
-
 
   const safeTransactions: MetaTransactionData[] = [
     {
@@ -89,8 +77,7 @@ async function relayTransaction() {
   ];
   const options: MetaTransactionOptions = {
     gasLimit: txConfig.GAS_LIMIT,
-    gasToken: txConfig.GAS_TOKEN,
-    isSponsored: false
+    isSponsored: true,
   };
 
   const response = await safeAccountAbstraction.relayTransaction(

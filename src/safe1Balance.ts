@@ -8,9 +8,8 @@ import {
   MetaTransactionData,
   MetaTransactionOptions,
   OperationType,
-  RelayTransaction
+  RelayTransaction,
 } from "@safe-global/safe-core-sdk-types";
-
 
 import * as dotenv from "dotenv";
 
@@ -22,12 +21,9 @@ const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
 const RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
 
 const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-const signer = new ethers.Wallet(
- process.env.PRIVATE_KEY,
-  provider
-);
+const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-const safeAddress = "YOUR SAFE ADDRESS";
+const safeAddress =  "YOUR SAFE ADDRESS";
 const chainId = 5;
 const targetAddress = ContractInfo.address;
 const GELATO_RELAY_API_KEY = process.env.GELATO_RELAY_API_KEY;
@@ -37,54 +33,45 @@ const nftContract = new ethers.Contract(
   signer
 );
 
-
 const gasLimit = "8000000";
 
-
 async function relayTransaction() {
-
   // Create a transaction object
-const relayKit = new GelatoRelayPack();
+  const relayKit = new GelatoRelayPack(GELATO_RELAY_API_KEY);
 
-const gasToken = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-const ethAdapter = new EthersAdapter({
-  ethers,
-  signerOrProvider: signer,
-});
+  const ethAdapter = new EthersAdapter({
+    ethers,
+    signerOrProvider: signer,
+  });
 
+  const safeSDK = await Safe.create({
+    ethAdapter,
+    safeAddress,
+  });
 
-const safeSDK = await Safe.create({
-  ethAdapter,
-  safeAddress,
-});
+  const safeTransactionData: MetaTransactionData = {
+    to: targetAddress,
+    data: nftContract.interface.encodeFunctionData("increment", []),
+    value: "0",
+    operation: OperationType.Call,
+  };
+  const options: MetaTransactionOptions = {
+    gasLimit,
+    isSponsored: true,
+  };
 
+  const standardizedSafeTx = await relayKit.createRelayedTransaction(
+    safeSDK,
+    [safeTransactionData],
+    options
+  );
 
-const safeTransactionData: MetaTransactionData = {
-  to: targetAddress,
-  data: nftContract.interface.encodeFunctionData("increment", []),
-  value: "0",
-  operation: OperationType.Call,
-  
-};
-const options: MetaTransactionOptions = {
-  gasLimit,
-  isSponsored: false,
-};
+  const safeSingletonContract = await getSafeContract({
+    ethAdapter: ethAdapter,
+    safeVersion: await safeSDK.getContractVersion(),
+  });
 
-
-const standardizedSafeTx = await relayKit.createRelayedTransaction(
-  safeSDK,
-  [safeTransactionData],
-  options
-)
-
-const safeSingletonContract = await getSafeContract({
-  ethAdapter: ethAdapter,
-  safeVersion: await safeSDK.getContractVersion()
-})
-
-const signedSafeTx = await safeSDK.signTransaction(standardizedSafeTx)
-
+  const signedSafeTx = await safeSDK.signTransaction(standardizedSafeTx);
 
   const encodedTx = safeSingletonContract.encode("execTransaction", [
     signedSafeTx.data.to,
@@ -98,7 +85,6 @@ const signedSafeTx = await safeSDK.signTransaction(standardizedSafeTx)
     signedSafeTx.data.refundReceiver,
     signedSafeTx.encodedSignatures(),
   ]);
-
 
   const relayTransaction: RelayTransaction = {
     target: safeAddress,
