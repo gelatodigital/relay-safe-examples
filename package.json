@@ -1,0 +1,28 @@
+{
+  "name": "safe-relay",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "docs": "ts-node src/docs.ts",
+    "account": "ts-node src/account.ts",
+    "stake": "ts-node src/stake.ts",
+    "build": "tsc",
+    "serve": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@gelatonetwork/relay-sdk": "^4.0.0",
+    "@safe-global/account-abstraction-kit-poc": "^1.2.0",
+    "@safe-global/protocol-kit": "^1.0.1",
+    "@safe-global/relay-kit": "^1.0.0",
+    "@safe-global/safe-core-sdk-types": "^2.0.0",
+    "@types/node": "^20.3.1",
+    "dotenv": "^16.3.1",
+    "ethers": "5.7.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.3"
+  }
+}
