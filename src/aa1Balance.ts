@@ -1,14 +1,11 @@
 import { ethers } from "ethers";
-import { GelatoRelayPack } from "@safe-global/relay-kit";
 import {
   MetaTransactionData,
   MetaTransactionOptions,
   OperationType,
 } from "@safe-global/safe-core-sdk-types";
 
-import AccountAbstraction, {
-  AccountAbstractionConfig,
-} from "@safe-global/account-abstraction-kit-poc";
+
 
 import * as dotenv from "dotenv";
 
@@ -17,13 +14,24 @@ dotenv.config({ path: ".env" });
 console.log(__dirname);
 
 import ContractInfo from "../ABI.json";
-const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
-const RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+import { GelatoRelayPack } from "@safe-global/relay-kit";
+import AccountAbstraction, { AccountAbstractionConfig } from "@safe-global/account-abstraction-kit-poc";
+const ALCHEMY_KEY  = process.env.ALCHEMY_KEY;
+let RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+
+
 const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+
+const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
+// const RPC_URL = "http://::1:8545/"//`https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+// const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+// const signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", provider);
+
 
 const GELATO_RELAY_API_KEY = process.env.GELATO_RELAY_API_KEY;
 
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+
 
 const relayPack = new GelatoRelayPack(GELATO_RELAY_API_KEY);
 
@@ -47,6 +55,10 @@ const safeTransactionData: MetaTransactionData = {
 };
 
 async function relayTransaction() {
+
+
+
+
   const safeAccountAbstraction = new AccountAbstraction(signer);
   const sdkConfig: AccountAbstractionConfig = {
     relayPack,

@@ -18,10 +18,12 @@ console.log(__dirname);
 
 import ContractInfo from "../ABI.json";
 const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
+// const RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+// const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+
 const RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
 const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider)
 
 const relayPack = new GelatoRelayPack();
 
@@ -85,5 +87,6 @@ async function relayTransaction() {
     options
   );
   console.log(`https://relay.gelato.digital/tasks/status/${response} `);
+
 }
 relayTransaction();
