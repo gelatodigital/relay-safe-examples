@@ -7,6 +7,7 @@ import Safe, {
   SafeAccountConfig,
 } from "@safe-global/protocol-kit";
 import {
+  EthAdapter,
   MetaTransactionData,
   MetaTransactionOptions,
   OperationType,
@@ -18,53 +19,63 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: ".env" });
 
 import ContractInfo from "../ABI.json";
+import { GelatoRelayPack } from "@safe-global/relay-kit";
 
 const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
-let RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+let RPC_URL = `https://opt-sepolia.g.alchemy.com/v2/gx1KIKr7LNYvg3XvRnsJoI0mQBTlGEei`;
 
-const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-const safeAddress = "0xde80C1a5A01f9C8d81E13405d949eB165e1F4191";
-
-const targetAddress = ContractInfo.address;
-const GELATO_RELAY_API_KEY = process.env.GELATO_RELAY_API_KEY;
+let targetAddress = ContractInfo.address;
 const nftContract = new ethers.Contract(
   targetAddress,
   ContractInfo.abi,
   signer
 );
-console.log(signer.address);
-const gasLimit = "8000000";
+
+const gasLimit = "100000000";
 
 async function relayTransaction() {
-  // Create a transaction object
-  //const relayKit = new GelatoRelayPack(GELATO_RELAY_API_KEY);
-  console.log(await provider.getNetwork());
-
   const ethAdapter = new EthersAdapter({
     ethers,
     signerOrProvider: signer,
   });
 
-  const safeFactory = await SafeFactory.create({ ethAdapter: ethAdapter });
+  let safeAddress = "0xc3F738b7B4fb394093c35927C4b0e2a4134102d5";
 
-  const safeAccountConfig: SafeAccountConfig = {
-    owners: [await signer.getAddress()],
-    threshold: 1,
-    // ... (Optional params)
-  };
+  try {
+    const safeFactory = await SafeFactory.create({ ethAdapter: ethAdapter });
 
-  /* This Safe is tied to owner 1 because the factory was initialized with
+    const safeAccountConfig: SafeAccountConfig = {
+      owners: [await signer.getAddress()],
+      threshold: 1,
+    };
+
+    /* This Safe is tied to owner 1 because the factory was initialized with
   an adapter that had owner 1 as the signer. */
 
-  const safeSdkOwner1 = await safeFactory.deploySafe({ safeAccountConfig });
+    const safeSdkOwner1 = await safeFactory.deploySafe({ safeAccountConfig });
 
-  const safeAddress = await safeSdkOwner1.getAddress();
+    safeAddress = await safeSdkOwner1.getAddress();
+  } catch (error) {}
 
-  const safeSDK = await Safe.create({
+  const protocolKit = await Safe.create({
     ethAdapter,
     safeAddress,
+  });
+
+  const predictedSafeAddress =
+    await protocolKit.getAddress();
+  console.log({ predictedSafeAddress });
+
+  const isSafeDeployed =
+    await protocolKit.isSafeDeployed();
+  console.log({ isSafeDeployed });
+
+  const relayKit = new GelatoRelayPack({
+    apiKey: process.env.GELATO_RELAY_API_KEY!,
+    protocolKit: protocolKit,
   });
 
   const safeTransactionData: MetaTransactionData = {
@@ -80,40 +91,39 @@ async function relayTransaction() {
 
   const safeSingletonContract = await getSafeContract({
     ethAdapter: ethAdapter,
-    safeVersion: await safeSDK.getContractVersion(),
+    safeVersion: await protocolKit.getContractVersion(),
   });
 
-  // const standardizedSafeTx = await relayKit.createRelayedTransaction(
-  //   {safe:safeSDK,
-  //    transactions:[safeTransactionData],
-  //   options}
-  // );
+  const standardizedSafeTx = await relayKit.createRelayedTransaction({
+    transactions: [safeTransactionData],
+    options,
+  });
 
-  // const signedSafeTx = await safeSDK.signTransaction(standardizedSafeTx);
+  const signedSafeTx = await protocolKit.signTransaction(standardizedSafeTx);
 
-  // const encodedTx = safeSingletonContract.encode("execTransaction", [
-  //   signedSafeTx.data.to,
-  //   signedSafeTx.data.value,
-  //   signedSafeTx.data.data,
-  //   signedSafeTx.data.operation,
-  //   signedSafeTx.data.safeTxGas,
-  //   signedSafeTx.data.baseGas,
-  //   signedSafeTx.data.gasPrice,
-  //   signedSafeTx.data.gasToken,
-  //   signedSafeTx.data.refundReceiver,
-  //   signedSafeTx.encodedSignatures(),
-  // ]);
+  const encodedTx = safeSingletonContract.encode("execTransaction", [
+    signedSafeTx.data.to,
+    signedSafeTx.data.value,
+    signedSafeTx.data.data,
+    signedSafeTx.data.operation,
+    signedSafeTx.data.safeTxGas,
+    signedSafeTx.data.baseGas,
+    signedSafeTx.data.gasPrice,
+    signedSafeTx.data.gasToken,
+    signedSafeTx.data.refundReceiver,
+    signedSafeTx.encodedSignatures(),
+  ]);
 
-  // const relayTransaction: RelayTransaction = {
-  //   target: safeAddress,
-  //   encodedTransaction: encodedTx,
-  //   chainId: 5,
-  //   options,
-  // };
+  const relayTransaction: RelayTransaction = {
+    target: safeAddress,
+    encodedTransaction: encodedTx,
+    chainId: BigInt(11155420),
+    options,
+  };
 
-  // const response = await relayKit.relayTransaction(relayTransaction);
-  // console.log(
-  //   `Relay Transaction Task ID: https://relay.gelato.digital/tasks/status/${response.taskId}`
-  // );
+  const response = await relayKit.relayTransaction(relayTransaction);
+  console.log(
+    `Relay Transaction Task ID: https://relay.gelato.digital/tasks/status/${response.taskId}`
+  );
 }
 relayTransaction();

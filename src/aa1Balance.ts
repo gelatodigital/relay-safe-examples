@@ -1,82 +1,69 @@
 import { ethers } from "ethers";
 import {
+  EthAdapter,
   MetaTransactionData,
   MetaTransactionOptions,
   OperationType,
 } from "@safe-global/safe-core-sdk-types";
 
-
-
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env" });
 
-console.log(__dirname);
+import { GelatoRelayPack } from "@safe-global/relay-kit";
+import AccountAbstraction from "@safe-global/account-abstraction-kit-poc";
 
 import ContractInfo from "../ABI.json";
-import { GelatoRelayPack } from "@safe-global/relay-kit";
-import AccountAbstraction, { AccountAbstractionConfig } from "@safe-global/account-abstraction-kit-poc";
-const ALCHEMY_KEY  = process.env.ALCHEMY_KEY;
-let RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+import { EthersAdapter } from "@safe-global/protocol-kit";
 
+const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
+let RPC_URL = `https://opt-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`;
 
-const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+const provider = new ethers.JsonRpcProvider(RPC_URL);
+const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
+const targetAddress = "0x00172f67db60E5fA346e599cdE675f0ca213b47b";
 
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
-// const RPC_URL = "http://::1:8545/"//`https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
-// const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-// const signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", provider);
-
-
-const GELATO_RELAY_API_KEY = process.env.GELATO_RELAY_API_KEY;
-
-
-
-const relayPack = new GelatoRelayPack(GELATO_RELAY_API_KEY);
-
-const chainId = 5;
-const targetAddress = ContractInfo.address;
-
-const nftContract = new ethers.Contract(
+const counterContract = new ethers.Contract(
   targetAddress,
   ContractInfo.abi,
   signer
 );
 
-const gasLimit = "10000000";
-// Create a transaction object
-
-const safeTransactionData: MetaTransactionData = {
-  to: targetAddress,
-  data: nftContract.interface.encodeFunctionData("increment", []),
-  value: "0",
-  operation: OperationType.Call,
-};
-
 async function relayTransaction() {
+  const gasLimit = "1000000000";
 
+  const ethAdapter = new EthersAdapter({
+    ethers,
+    signerOrProvider: signer,
+  }) ;
 
+  const safeAccountAbstraction = new AccountAbstraction(ethAdapter);
 
+  await safeAccountAbstraction.init();
 
-  const safeAccountAbstraction = new AccountAbstraction(signer);
-  const sdkConfig: AccountAbstractionConfig = {
-    relayPack,
-  };
-  await safeAccountAbstraction.init(sdkConfig);
+  const protocolKit = safeAccountAbstraction.protocolKit;
+  const relayPack = new GelatoRelayPack({
+    apiKey: process.env.GELATO_RELAY_API_KEY!,
+    protocolKit,
+  });
 
+  await safeAccountAbstraction.setRelayKit(relayPack);
+
+  // Create a transaction object
   const txConfig = {
     TO: targetAddress,
-    DATA: safeTransactionData.data,
-    VALUE: "0",
+    DATA: counterContract.interface.encodeFunctionData("increment", []),
     // Options:
     GAS_LIMIT: gasLimit,
+    VALUE: "0",
   };
 
-  const predictedSafeAddress = await safeAccountAbstraction.getSafeAddress();
+  const predictedSafeAddress =
+    await safeAccountAbstraction.protocolKit.getAddress();
   console.log({ predictedSafeAddress });
 
-  const isSafeDeployed = await safeAccountAbstraction.isSafeDeployed();
+  const isSafeDeployed =
+    await safeAccountAbstraction.protocolKit.isSafeDeployed();
   console.log({ isSafeDeployed });
 
   const safeTransactions: MetaTransactionData[] = [
@@ -92,10 +79,11 @@ async function relayTransaction() {
     isSponsored: true,
   };
 
-  const response = await safeAccountAbstraction.relayTransaction(
+  const response = (await safeAccountAbstraction.relayTransaction(
     safeTransactions,
     options
-  );
-  console.log(`https://relay.gelato.digital/tasks/status/${response} `);
+  )) as { taskId: string };
+
+  console.log(`https://relay.gelato.digital/tasks/status/${response.taskId} `);
 }
 relayTransaction();

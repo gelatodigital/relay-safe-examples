@@ -1,33 +1,31 @@
 import { ethers } from "ethers";
 import { GelatoRelayPack } from "@safe-global/relay-kit";
 import {
+  EthAdapter,
   MetaTransactionData,
   MetaTransactionOptions,
   OperationType,
 } from "@safe-global/safe-core-sdk-types";
 
-import AccountAbstraction, {
-  AccountAbstractionConfig,
-} from "@safe-global/account-abstraction-kit-poc";
+import AccountAbstraction from "@safe-global/account-abstraction-kit-poc";
 
 import * as dotenv from "dotenv";
 
 dotenv.config({ path: ".env" });
 
-console.log(__dirname);
-
 import ContractInfo from "../ABI.json";
-const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
-// const RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
-// const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+import { EthersAdapter } from "@safe-global/protocol-kit";
 
-const RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
-const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+
+const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
+let RPC_URL = `https://opt-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+
+const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider)
 
-const relayPack = new GelatoRelayPack();
 
-const chainId = 5;
+
+
 const targetAddress = ContractInfo.address;
 
 const nftContract = new ethers.Contract(
@@ -47,11 +45,20 @@ const safeTransactionData: MetaTransactionData = {
 };
 
 async function relayTransaction() {
-  const safeAccountAbstraction = new AccountAbstraction(signer);
-  const sdkConfig: AccountAbstractionConfig = {
-    relayPack,
-  };
-  await safeAccountAbstraction.init(sdkConfig);
+
+  const ethAdapter = new EthersAdapter({
+    ethers,
+    signerOrProvider: signer
+  }) as unknown as EthAdapter
+
+  const safeAccountAbstraction = new AccountAbstraction(ethAdapter);
+
+  await safeAccountAbstraction.init();
+
+  const protocolKit = safeAccountAbstraction.protocolKit;
+  const relayPack = new GelatoRelayPack(({ apiKey: process.env.GELATO_RELAY_API_KEY!,protocolKit}));
+  
+    await safeAccountAbstraction.setRelayKit(relayPack)
 
   const txConfig = {
     TO: targetAddress,
@@ -59,13 +66,13 @@ async function relayTransaction() {
     VALUE: "0",
     // Options:
     GAS_LIMIT: gasLimit,
-    GAS_TOKEN: ethers.constants.AddressZero,
+    GAS_TOKEN: ethers.ZeroAddress
   };
 
-  const predictedSafeAddress = await safeAccountAbstraction.getSafeAddress();
+  const predictedSafeAddress = await safeAccountAbstraction.protocolKit.getAddress();
   console.log({ predictedSafeAddress });
 
-  const isSafeDeployed = await safeAccountAbstraction.isSafeDeployed();
+  const isSafeDeployed = await safeAccountAbstraction.protocolKit.isSafeDeployed()
   console.log({ isSafeDeployed });
 
   const safeTransactions: MetaTransactionData[] = [
@@ -85,8 +92,9 @@ async function relayTransaction() {
   const response = await safeAccountAbstraction.relayTransaction(
     safeTransactions,
     options
-  );
-  console.log(`https://relay.gelato.digital/tasks/status/${response} `);
+  ) as { taskId:string};
+
+  console.log(`https://relay.gelato.digital/tasks/status/${response.taskId} `);
 
 }
 relayTransaction();

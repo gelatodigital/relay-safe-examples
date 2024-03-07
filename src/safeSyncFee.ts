@@ -2,6 +2,8 @@ import { ethers } from "ethers";
 import { GelatoRelayPack } from "@safe-global/relay-kit";
 import Safe, {
   EthersAdapter,
+  SafeAccountConfig,
+  SafeFactory,
   getSafeContract,
 } from "@safe-global/protocol-kit";
 import {
@@ -18,24 +20,10 @@ dotenv.config({ path: ".env" });
 import ContractInfo from "../ABI.json";
 
 const ALCHEMY_KEY = process.env.ALCHEMY_KEY;
-let RPC_URL = `https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
-const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+let RPC_URL = `https://opt-sepolia.g.alchemy.com/v2/gx1KIKr7LNYvg3XvRnsJoI0mQBTlGEei`;
+
+const provider = new ethers.JsonRpcProvider(RPC_URL);
 const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
-// const RPC_URL = "http://::1:8545/"//`https://eth-goerli.g.alchemy.com/v2/${ALCHEMY_KEY}`;
-// const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-// const signer = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", provider);
-
-
-
-console.log(signer.address)
-
-
-
-let safeAddress =  "0xaF6EC264c3cf7EF02bDf96D912812D78E3D0d18D";
-safeAddress =  "0x68D60c586763879c6614e2eFA709cCae708203c4"
-
-
 
 const targetAddress = ContractInfo.address;
 const nftContract = new ethers.Contract(
@@ -44,31 +32,49 @@ const nftContract = new ethers.Contract(
   signer
 );
 
-const gasLimit = "8000000";
+const gasLimit = "10000000";
 
 async function relayTransaction() {
-  // Create a transaction object
-
-// let tx = await signer.sendTransaction({
-//   to:safeAddress,
-//   data:"0x",
-//   value: ethers.utils.parseEther("0.1")
-// })
-// await tx.wait();
 
 
-  const relayKit = new GelatoRelayPack();
 
-  const gasToken = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const ethAdapter = new EthersAdapter({
     ethers,
     signerOrProvider: signer,
   });
 
-  const safeSDK = await Safe.create({
+  let safeAddress = "0xc3F738b7B4fb394093c35927C4b0e2a4134102d5";
+
+  try {
+    const safeFactory = await SafeFactory.create({ ethAdapter: ethAdapter });
+
+    const safeAccountConfig: SafeAccountConfig = {
+      owners: [await signer.getAddress()],
+      threshold: 1,
+    };
+
+    /* This Safe is tied to owner 1 because the factory was initialized with
+  an adapter that had owner 1 as the signer. */
+
+    const safeSdkOwner1 = await safeFactory.deploySafe({ safeAccountConfig });
+
+    safeAddress = await safeSdkOwner1.getAddress();
+  } catch (error) {}
+
+
+  const protocolKit= await Safe.create({
     ethAdapter,
     safeAddress,
   });
+  const predictedSafeAddress =
+    await protocolKit.getAddress();
+  console.log({ predictedSafeAddress });
+
+  const isSafeDeployed =
+    await protocolKit.isSafeDeployed();
+  console.log({ isSafeDeployed });
+
+  const relayKit = new GelatoRelayPack({ apiKey: process.env.GELATO_RELAY_API_KEY!, protocolKit})
 
   const safeTransactionData: MetaTransactionData = {
     to: targetAddress,
@@ -82,19 +88,18 @@ async function relayTransaction() {
   };
 
   const standardizedSafeTx = await relayKit.createRelayedTransaction({
-    safe:safeSDK,
+
     transactions:[safeTransactionData],
-   // options
+    options
 });
 
   const safeSingletonContract = await getSafeContract({
     ethAdapter: ethAdapter,
-    safeVersion: await safeSDK.getContractVersion(),
+    safeVersion: await protocolKit.getContractVersion(),
   });
 
-  const signedSafeTx = await safeSDK.signTransaction(standardizedSafeTx);
+  const signedSafeTx = await protocolKit.signTransaction(standardizedSafeTx);
 
-  const response = await relayKit.executeRelayTransaction(signedSafeTx, safeSDK)
 
   const encodedTx = safeSingletonContract.encode("execTransaction", [
     signedSafeTx.data.to,
@@ -112,11 +117,12 @@ async function relayTransaction() {
   const relayTransaction: RelayTransaction = {
     target: safeAddress,
     encodedTransaction: encodedTx,
-    chainId: 5,
+    chainId: BigInt(11155420),
     options,
   };
 
-  // const response = await relayKit.relayTransaction(relayTransaction);
+
+   const response = await relayKit.relayTransaction(relayTransaction);
   console.log(
     `Relay Transaction Task ID: https://relay.gelato.digital/tasks/status/${response.taskId}`
   );
